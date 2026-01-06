@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Aircraft Weight & Balance</title>
+<style>
+body{
+ font-family:"Segoe UI",Arial,sans-serif;
+ background:radial-gradient(circle at top,#1b3a57 0%,#0b1f33 45%,#071521 100%);
+ margin:0;padding:20px;
+}
+.card{
+ max-width:1050px;margin:auto;
+ background:linear-gradient(180deg,#ffffff 0%,#f4f8fc 100%);
+ padding:26px;border-radius:16px;
+ box-shadow:0 20px 40px rgba(0,0,0,.35);
+}
+h1{margin:0;color:#0b2a45}
+.subtitle{color:#355f8c;font-size:13px;text-transform:uppercase}
+.aviation-bar{height:6px;background:linear-gradient(90deg,#1f6feb,#6cbcff,#1f6feb);margin:12px 0 22px;border-radius:6px}
+
+table{width:100%;border-collapse:collapse;margin-bottom:18px}
+th,td{border-bottom:1px solid #d7e2f1;padding:10px;text-align:center}
+th{background:#eaf2fb;font-size:12px}
+input{width:100%;padding:7px;border-radius:8px;border:1px solid #c7d6ea;text-align:center}
+input[readonly]{background:#eef2f7}
+
+button{padding:14px 22px;font-size:16px;border:none;border-radius:10px;cursor:pointer;background:#1f6feb;color:#fff;margin-top:10px;}
+button.clear{background:#6b7280}
+
+.safe{color:#1a7f37;font-weight:bold}
+.unsafe{color:#b42318;font-weight:bold}
+
+#limitsBox,#envelopeBox{
+ background:#eef5ff;
+ border:1px solid #c7d6ea;
+ padding:14px;border-radius:12px;
+ margin-bottom:18px;
+}
+svg{background:#fff;border:1px solid #c7d6ea;border-radius:12px}
+
+footer{margin-top:30px;border-top:1px dashed #c7d6ea;padding-top:16px;font-size:13px}
+.group{columns:2;line-height:1.6}
+</style>
+</head>
+<body onload="updateAircraft()">
+<div class="card">
+
+<h1>Aircraft Weight and Balance Calculator</h1>
+<p class="subtitle">Prepared by: Group 1 – Aviation Maintenance Technology</p>
+
+<div class="aviation-bar"></div>
+
+<label>Aircraft:</label>
+<select id="aircraftType" onchange="updateAircraft()">
+ <option value="C150">Cessna 150</option>
+ <option value="PA28A">Piper Archer</option>
+</select>
+
+<div id="limitsBox">
+<h3>Aircraft Limits</h3>
+<p>MTOW: <span id="mtow"></span> lb</p>
+<p>MLW: <span id="mlw"></span> lb</p>
+<p>MZFW: <span id="mzfw"></span> lb</p>
+<p>CG Range: <span id="cgRange"></span> in</p>
+</div>
+
+<table>
+<tr><th>Item</th><th>Weight (lb)</th><th>Arm (in)</th><th>Moment</th></tr>
+
+<tr>
+<td>Basic Empty Weight (BEW)</td>
+<td><input id="w_bew" readonly></td>
+<td><input id="a_bew" readonly></td>
+<td id="m_bew">0</td>
+</tr>
+
+<tr><td>Pilot</td><td><input id="w_pilot" type="number"></td><td><input id="a_pilot" type="number"></td><td id="m_pilot">0</td></tr>
+<tr><td>Passenger</td><td><input id="w_passenger" type="number"></td><td><input id="a_passenger" type="number"></td><td id="m_passenger">0</td></tr>
+<tr><td>Fuel</td><td><input id="w_fuel" type="number"></td><td><input id="a_fuel" type="number"></td><td id="m_fuel">0</td></tr>
+<tr><td>Baggage</td><td><input id="w_bag" type="number"></td><td><input id="a_bag" type="number"></td><td id="m_bag">0</td></tr>
+</table>
+
+<button onclick="calculate()">Calculate</button>
+<button class="clear" onclick="clearAll()">Clear All</button>
+
+<h3>Results</h3>
+<p>Total Weight: <span id="totalWeight">0</span> lb</p>
+<p>Total Moment: <span id="totalMoment">0</span> lb·in</p>
+<p>CG: <span id="cg">0</span> in</p>
+<p>Status: <span id="status">---</span></p>
+
+<div id="envelopeBox">
+<h3>Weight & Balance Envelope</h3>
+<svg id="envelope" width="600" height="400"></svg>
+</div>
+
+<footer>
+<strong>Group 1 Members</strong>
+<div class="group">
+BUNDOC, ADRIAN B.<br>
+GRAJO, ALDRIN JOHN D.<br>
+VENERACION, ALDWIN M.<br>
+NOJADERA, ALEN NICO B.<br>
+SADIE, ALLEN CHRISTOFFE L.<br>
+MAUHAY, ALLEN JEMUEL S.<br>
+HILARIO, ANGELICA G.<br>
+DE SOTTO, BRIAN F.<br>
+GOJO CRUZ, BRYCE ANJELO D.<br>
+DAYAO, CYRUS JAY C.<br>
+PUNONGBAYAN, DAN GUILLERMO P.<br>
+SALES, DANTE F.<br>
+CASTRO, DWAYNE AIKEN P.<br>
+ORTEGA, EARL DUSTIN S.<br>
+CANASA, GABRIEL ANGELO V.<br>
+RONDOLOS, GV M.
+</div>
+</footer>
+
+</div>
+
+<script>
+// Aircraft data with limits, BEW, and envelope polygon (doghouse)
+const aircraftData={
+ C150:{
+  BEW:{w:1100,a:32},
+  limits:{MTOW:1600,MLW:1600,MZFW:1450,cgMin:31,cgMax:41},
+  envelope:[[31,1100],[33,1600],[41,1600],[39,1100]] // simplified doghouse
+ },
+ PA28A:{
+  BEW:{w:1450,a:35},
+  limits:{MTOW:2450,MLW:2450,MZFW:2200,cgMin:34,cgMax:47},
+  envelope:[[34,1450],[36,2450],[47,2450],[45,1450]]
+ }
+};
+
+let current;
+
+function updateAircraft(){
+ current=aircraftData[aircraftType.value];
+ // BEW
+ w_bew.value=current.BEW.w;
+ a_bew.value=current.BEW.a;
+ m_bew.textContent=(current.BEW.w*current.BEW.a).toFixed(1);
+ // Limits
+ mtow.textContent=current.limits.MTOW;
+ mlw.textContent=current.limits.MLW;
+ mzfw.textContent=current.limits.MZFW;
+ cgRange.textContent=current.limits.cgMin+" – "+current.limits.cgMax;
+ drawEnvelope();
+ clearResults();
+}
+
+// Draw envelope polygon
+function drawEnvelope(){
+ const svg=document.getElementById("envelope");
+ svg.innerHTML="";
+ const pts=current.envelope.map(p=>`${(p[0]-30)*20},${400-(p[1]-1000)/4}`).join(" ");
+ svg.innerHTML+=`<polygon points="${pts}" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>`;
+}
+
+// Plot calculated CG dot
+function plotPoint(cg,w,safe){
+ const svg=document.getElementById("envelope");
+ const x=(cg-30)*20;
+ const y=400-(w-1000)/4;
+ svg.innerHTML+=`<circle cx="${x}" cy="${y}" r="6" fill="${safe?'green':'red'}"/>`;
+}
+
+// Play buzzer sound
+function playBuzzer(frequency,duration){
+ const ctx=new (window.AudioContext||window.webkitAudioContext)();
+ const osc=ctx.createOscillator();
+ const gain=ctx.createGain();
+ osc.connect(gain); gain.connect(ctx.destination);
+ osc.type='square';
+ osc.frequency.value=frequency;
+ osc.start();
+ gain.gain.setValueAtTime(0.1,ctx.currentTime);
+ osc.stop(ctx.currentTime+duration);
+}
+
+// Clear all inputs/results
+function clearAll(){
+ ["pilot","passenger","fuel","bag"].forEach(i=>{
+  document.getElementById("w_"+i).value="";
+  document.getElementById("a_"+i).value="";
+  document.getElementById("m_"+i).textContent="0";
+ });
+ clearResults();
+ drawEnvelope();
+}
+
+// Clear results only
+function clearResults(){
+ totalWeight.textContent="0";
+ totalMoment.textContent="0";
+ cg.textContent="0";
+ status.textContent="---";
+ status.className="";
+}
+
+// Main calculation
+function calculate(){
+ let items=["bew","pilot","passenger","fuel","bag"];
+ let tw=0,tm=0;
+ items.forEach(i=>{
+  const w=+document.getElementById("w_"+i).value||0;
+  const a=+document.getElementById("a_"+i).value||0;
+  const m=w*a;
+  if(document.getElementById("m_"+i)) document.getElementById("m_"+i).textContent=m.toFixed(1);
+  tw+=w; tm+=m;
+ });
+ totalWeight.textContent=tw.toFixed(1);
+ totalMoment.textContent=tm.toFixed(1);
+ const cgVal=tm/tw;
+ cg.textContent=cgVal.toFixed(2);
+
+ // check safety
+ const L=current.limits;
+ const safe=tw<=L.MTOW && cgVal>=L.cgMin && cgVal<=L.cgMax;
+ status.textContent=safe?"SAFE":"UNSAFE";
+ status.className=safe?"safe":"unsafe";
+
+ // plot envelope and dot
+ drawEnvelope();
+ plotPoint(cgVal,tw,safe);
+
+ // sound
+ playBuzzer(safe?1000:200,0.3);
+}
+</script>
+</body>
+</html>
